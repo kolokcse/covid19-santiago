@@ -31,6 +31,13 @@ class Parser
         jf = nlohmann::json::parse(ifs);
     }
 
+    
+    int parse_Npop()
+    {
+        string Npop = jf["Npop"];
+        return stoi(Npop);
+    }
+
 
     /**
      * Parse commuting networks

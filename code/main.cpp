@@ -6,6 +6,18 @@
 
 using namespace std;
 
+struct Args{
+    std::string config_file = "./input/config.json";
+};
+
+void read_args(int argc, char* argv[], Args& args){
+    for(int i=0;i<argc;i++){
+        std::string act_param = argv[i];
+        if(act_param=="--config") args.config_file = argv[++i];
+        //else if(act_param=="--verbose"){ args.verbose=true;++i;}
+    }
+}
+
 /**
  * Compute beta given R0
  */
@@ -107,10 +119,17 @@ double get_lambda_tot(int pop_idx, int age_idx, double tau, double beta, vector<
  */
 int main(int argc, char *argv[])
 {
+    // -- args and parser
+    Args args;
+    read_args(argc, argv, args);
+    Parser parser = Parser(args.config_file);
 
     // number of comunas, age groups, and simulations per parameters
-    int Npop = 39;
+    //int Npop = 39;
+    int Npop = parser.parse_Npop();
     int K = 16;
+
+    std::cout<<Npop<<std::endl;
 
     // parameters
     double mu = 1 / 2.5;
@@ -120,8 +139,6 @@ int main(int argc, char *argv[])
     double beta = get_beta(R0, mu, 16.204308331681283);
     vector<double> betas;
 
-    // parser
-    Parser parser = Parser("./input/config.json");
 
     // commuting
     vector<vector<double>> sigmas = parser.parse_commuting();
