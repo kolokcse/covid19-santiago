@@ -1,0 +1,7 @@
+{
+    "commuting_file": "commuting_KSH.json",
+    "populations_file": "populations_KSH.json",
+    "contacts_file_home": "contacts_home.json",
+    "contacts_file_other": "contacts_other.json",
+    "Npop": "168"
+}

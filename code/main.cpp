@@ -7,13 +7,26 @@
 using namespace std;
 
 struct Args{
-    std::string config_file = "./input/config.json";
+    std::string config_folder = "./input/santiago";
+    std::string output_file = "./output/results.txt";
+    int moving_t = 0;
+    double R0 = 2.6;
+    double r1 = 1.0;
+    double r2 = 1.0;
 };
 
 void read_args(int argc, char* argv[], Args& args){
     for(int i=0;i<argc;i++){
         std::string act_param = argv[i];
-        if(act_param=="--config") args.config_file = argv[++i];
+        if(act_param=="--config"){
+            args.config_folder = argv[++i];
+            if(args.config_folder.back() != '/') args.config_folder += '/';
+        }
+        else if(act_param=="--out") args.output_file = argv[++i];
+        else if(act_param=="--moving_t") args.R0 = std::stoi(argv[++i]);
+        else if(act_param=="--R0") args.R0 = std::stod(argv[++i]);
+        else if(act_param=="--r1") args.r1 = std::stod(argv[++i]);
+        else if(act_param=="--r2") args.r2 = std::stod(argv[++i]);
         //else if(act_param=="--verbose"){ args.verbose=true;++i;}
     }
 }
@@ -114,6 +127,19 @@ double get_lambda_tot(int pop_idx, int age_idx, double tau, double beta, vector<
 }
 
 
+void update_moving(
+    int K,
+    int Npop,
+    vector<vector<double>>& Nk_eff,
+    vector<vector<double>>& sigmas,
+    vector<double>& sigmas_j,
+    vector<vector<vector<double>>>& C,
+    vector<vector<double>>& C1,
+    vector<vector<double>>& C2,
+    vector<double>& r){
+    
+}
+
 /**
  * Main
  */
@@ -122,7 +148,7 @@ int main(int argc, char *argv[])
     // -- args and parser
     Args args;
     read_args(argc, argv, args);
-    Parser parser = Parser(args.config_file);
+    Parser parser = Parser(args.config_folder);
 
     // number of comunas, age groups, and simulations per parameters
     //int Npop = 39;
@@ -153,16 +179,25 @@ int main(int argc, char *argv[])
     vector<vector<double>> R = parser.parse_compartments("R");
     vector<vector<double>> Nk = parser.parse_compartments("N");
 
-
     // contacts (home, other)
     vector<vector<double>> C1 = parser.parse_contacts(1);
     vector<vector<double>> C2 = parser.parse_contacts(2);
-    vector<vector<vector<double>>> C;
-    for (int i = 0; i < Npop; i++)
-        C.push_back(sumMat(C1, C2, K));
 
-    vector<double> r1 = parser.parse_r(1);
-    vector<double> r2 = parser.parse_r(2);
+    vector<double> r1,r2;
+    if(args.r1 == -1.0){
+        r1 = parser.parse_r(1);
+        r2 = parser.parse_r(2);
+    }
+    else{
+        r1 = std::vector<double>(C1.size(), args.r1);
+        r2 = std::vector<double>(C1.size(), args.r2);
+    }
+
+    vector<vector<vector<double>>> C;
+    for (int i = 0; i < Npop; i++){
+        //C.push_back(sumMat(C1, C2, K));
+        C.push_back(sumMat(scalarProductMat(C1, r1[i], K), scalarProductMat(C2, r1[i], K), K));
+    }
 
     std::cout << "Parsing complete..." << '\n';
 
@@ -183,7 +218,7 @@ int main(int argc, char *argv[])
     double lambda = 0.0;
 
     // write results header
-    ofstream resFile("./output/results.txt");
+    ofstream resFile(args.output_file);
     for (int i = 0; i < Npop; i++)
         for (int k = 0; k < K; k++)
             resFile << "I_" << to_string(i) << "_" << to_string(k) << "," << "R_" << to_string(i) << "_" << to_string(k) << "," ;
@@ -191,35 +226,10 @@ int main(int argc, char *argv[])
 
     std::cout << "Start Simulation" << '\n';
     // simulate
-    for (int t = 60; t < 250; t++)
+    for (int t = 0; t < 175; t++)
     {
-        if (t == 75) // restrictions
-        {
-            std::cout << "Implement First Lockdown" << '\n';
-            // import new commuting, recompute C and Nk_eff
-            Parser parser = Parser("./input/config_soft.json");
-
-            C.clear();
-            for (int i = 0; i < Npop; i++)
-                C.push_back(sumMat(scalarProductMat(C1, r1[i], K), scalarProductMat(C2, r1[i], K), K));
-
-            sigmas.clear();
-            sigmas_j.clear();
-            sigmas = parser.parse_commuting();
-            for (int i = 0; i < Npop; i++)
-                sigmas_j.push_back(get_sigma(i, sigmas));
-
-            for (int i = 0; i < Npop; i++)
-                for (int k = 0; k < K; k++)
-                    Nk_eff[i][k] = get_Nk_eff(i, k, tau, Nk, sigmas, sigmas_j);
-        }
-
-        else if (t == 136)  // lockdown
-        {
-            std::cout << "Implement Second Lockdown" << '\n';
-            // import new commuting, recompute C and Nk_eff
-            Parser parser = Parser("./input/config_lockdown.json");
-
+        std::cout<<"\r"<<t<<"    "<<std::flush;
+        if (t == args.moving_t){ // restrictions
             C.clear();
             for (int i = 0; i < Npop; i++)
                 C.push_back(sumMat(scalarProductMat(C1, r2[i], K), scalarProductMat(C2, r2[i], K), K));
@@ -234,7 +244,6 @@ int main(int argc, char *argv[])
                 for (int k = 0; k < K; k++)
                     Nk_eff[i][k] = get_Nk_eff(i, k, tau, Nk, sigmas, sigmas_j);
         }
-
 
         for (int i = 0; i < Npop; i++)
         {

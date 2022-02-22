@@ -21,13 +21,13 @@ using namespace std;
 class Parser
 {
     public:
-        string file;
+        string folder;
         nlohmann::json jf;
 
     Parser(string f)
     {
-        file = f;
-        ifstream ifs(file);
+        folder = f;
+        ifstream ifs(folder + "config.json");
         jf = nlohmann::json::parse(ifs);
     }
 
@@ -45,7 +45,7 @@ class Parser
     vector<vector<double>> parse_commuting()
     {
         string commuting_file = jf["commuting_file"];
-        ifstream ifs(commuting_file);
+        ifstream ifs(folder + commuting_file);
         nlohmann::json jf_commuting = nlohmann::json::parse(ifs);
         int N = jf_commuting["N"];
         vector<vector<double>> sigmas(N, vector<double>(N, 0.0));
@@ -65,7 +65,7 @@ class Parser
             contacts_file = jf["contacts_file_home"];
         else
             contacts_file = jf["contacts_file_other"];
-        ifstream ifs(contacts_file);
+        ifstream ifs(folder + contacts_file);
         nlohmann::json jf_contacts = nlohmann::json::parse(ifs);
         int K = jf_contacts["K"];
         vector<vector<double>> C(K, vector<double>(K, 0.0));
@@ -83,7 +83,7 @@ class Parser
         vector<vector<double>> compartment;
         vector<double> compart_age;
         string compartments_file = jf["populations_file"];
-        ifstream ifs(compartments_file);
+        ifstream ifs(folder + compartments_file);
         nlohmann::json jf_compartments = nlohmann::json::parse(ifs);
         for (auto& el : jf_compartments["populations"].items())
         {
@@ -105,7 +105,7 @@ class Parser
         if (i != 1)
             rr = "r2";
         string r_file = jf["populations_file"];
-        ifstream ifs(r_file);
+        ifstream ifs(folder + r_file);
         nlohmann::json jf_r = nlohmann::json::parse(ifs);
         for (auto& el : jf_r["populations"].items())
             r.push_back(el.value()[rr]);
