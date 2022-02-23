@@ -13,6 +13,7 @@ struct Args{
     double R0 = 2.6;
     double r1 = 1.0;
     double r2 = 1.0;
+    unsigned int maxT = 175;
 };
 
 void read_args(int argc, char* argv[], Args& args){
@@ -27,6 +28,7 @@ void read_args(int argc, char* argv[], Args& args){
         else if(act_param=="--R0") args.R0 = std::stod(argv[++i]);
         else if(act_param=="--r1") args.r1 = std::stod(argv[++i]);
         else if(act_param=="--r2") args.r2 = std::stod(argv[++i]);
+        else if(act_param=="--maxT") args.maxT = std::stoi(argv[++i]);
         //else if(act_param=="--verbose"){ args.verbose=true;++i;}
     }
 }
@@ -151,8 +153,8 @@ int main(int argc, char *argv[])
     Parser parser = Parser(args.config_folder);
 
     // number of comunas, age groups, and simulations per parameters
-    //int Npop = 39;
     int Npop = parser.parse_Npop();
+    // Number of age categories
     int K = 16;
 
     std::cout<<Npop<<std::endl;
@@ -161,7 +163,7 @@ int main(int argc, char *argv[])
     double mu = 1 / 2.5;
     double eps = 1 / 4.0;
     double tau = 3.0;
-    double R0 = 2.6;
+    double R0 = args.R0;
     double beta = get_beta(R0, mu, 16.204308331681283);
     vector<double> betas;
 
@@ -226,7 +228,7 @@ int main(int argc, char *argv[])
 
     std::cout << "Start Simulation" << '\n';
     // simulate
-    for (int t = 0; t < 175; t++)
+    for (int t = 0; t < args.maxT; t++)
     {
         std::cout<<"\r"<<t<<"    "<<std::flush;
         if (t == args.moving_t){ // restrictions
