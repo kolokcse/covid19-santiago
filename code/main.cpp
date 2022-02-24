@@ -9,7 +9,7 @@ using namespace std;
 struct Args{
     std::string config_folder = "./input/santiago";
     std::string output_file = "./output/results.txt";
-    int moving_t = 0;
+    int moving_t = -1;
     double R0 = 2.6;
     double r1 = 1.0;
     double r2 = 1.0;
