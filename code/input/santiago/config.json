@@ -1,6 +1,6 @@
-{"transitions_file": "./input/slir.json",
-  "commuting_file": "./input/commuting1.json",
-  "populations_file": "./input/populations.json",
-  "contacts_file_home": "./input/contacts_home.json",
-  "contacts_file_other": "./input/contacts_other.json",
+{
+  "commuting_file": "commuting1.json",
+  "populations_file": "populations.json",
+  "contacts_file_home": "contacts_home.json",
+  "contacts_file_other": "contacts_other.json",
   "Npop":"39"}
