@@ -191,8 +191,8 @@ int main(int argc, char *argv[])
         r2 = parser.parse_r(2);
     }
     else{
-        r1 = std::vector<double>(C1.size(), args.r1);
-        r2 = std::vector<double>(C1.size(), args.r2);
+        r1 = std::vector<double>(Npop, args.r1);
+        r2 = std::vector<double>(Npop, args.r2);
     }
 
     vector<vector<vector<double>>> C;

@@ -4,7 +4,8 @@
 
 #include "sampler.h"
 random_device device;
-mt19937 g(device());
+mt19937 g(0);
+//mt19937 g(device());
 
 /**
  * Binomial distribution sampler
