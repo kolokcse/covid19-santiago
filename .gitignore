@@ -3,3 +3,5 @@ data/hun
 */bin/main
 code/output/sim/
 code/output
+*.gch
+*.out

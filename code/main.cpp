@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include "./include/sampler.h"
 #include "./include/Parser.h"
+#include <math.h>
 
 using namespace std;
 
@@ -14,6 +15,7 @@ struct Args{
     double r1 = 1.0;
     double r2 = 1.0;
     unsigned int maxT = 175;
+    double c = 1.0;
 };
 
 void read_args(int argc, char* argv[], Args& args){
@@ -29,8 +31,13 @@ void read_args(int argc, char* argv[], Args& args){
         else if(act_param=="--r1") args.r1 = std::stod(argv[++i]);
         else if(act_param=="--r2") args.r2 = std::stod(argv[++i]);
         else if(act_param=="--maxT") args.maxT = std::stoi(argv[++i]);
+        else if(act_param=="--c") args.c = std::stod(argv[++i]);
         //else if(act_param=="--verbose"){ args.verbose=true;++i;}
     }
+}
+
+double seasonality(double c, double t){
+    return 0.5*c*cos(2*M_PI*t/366.0)+(1-0.5*c);
 }
 
 /**
@@ -228,7 +235,8 @@ int main(int argc, char *argv[])
 
     std::cout << "Start Simulation" << '\n';
     // simulate
-    for (int t = 0; t < args.maxT; t++)
+    int T0 = 243;
+    for (int t = T0; t < T0+args.maxT; t++)
     {
         std::cout<<"\r"<<t<<"    "<<std::flush;
         if (t == args.moving_t){ // restrictions
@@ -247,12 +255,13 @@ int main(int argc, char *argv[])
                     Nk_eff[i][k] = get_Nk_eff(i, k, tau, Nk, sigmas, sigmas_j);
         }
 
+        double act_beta = beta*seasonality(args.c, t);
         for (int i = 0; i < Npop; i++)
         {
             for (int k = 0; k < K; k++)
             {
                 // S -> L
-                lambda = get_lambda_tot(i, k, tau, beta, Nk_eff, I, C, sigmas, sigmas_j);
+                lambda = get_lambda_tot(i, k, tau, act_beta, Nk_eff, I, C, sigmas, sigmas_j);
                 newL = binomial(S[i][k], lambda);
 
                 // L -> I
