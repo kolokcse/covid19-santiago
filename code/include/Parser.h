@@ -74,6 +74,18 @@ class Parser
         return C;
     }
 
+    vector<vector<double>> parse_contacts(std::string contacts_file)
+    {
+        if(contacts_file == "") contacts_file = jf["contacts_file_home"];
+        ifstream ifs(folder + contacts_file);
+        nlohmann::json jf_contacts = nlohmann::json::parse(ifs);
+        int K = jf_contacts["K"];
+        vector<vector<double>> C(K, vector<double>(K, 0.0));
+        for (auto& el : jf_contacts["rates"].items())
+            C[int(el.value()["from"])][int(el.value()["to"])] = double(el.value()["rate"]);
+        return C;
+    }
+
 
     /**
      * Parse compartment

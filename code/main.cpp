@@ -10,12 +10,13 @@ using namespace std;
 struct Args{
     std::string config_folder = "./input/santiago";
     std::string output_file = "./output/results.txt";
+    std::string contact_mtx = "";
     int moving_t = -1;
     double R0 = 2.6;
     double r1 = 1.0;
     double r2 = 1.0;
     unsigned int maxT = 175;
-    double c = 1.0;
+    double c = 0.0;
 };
 
 void read_args(int argc, char* argv[], Args& args){
@@ -26,7 +27,8 @@ void read_args(int argc, char* argv[], Args& args){
             if(args.config_folder.back() != '/') args.config_folder += '/';
         }
         else if(act_param=="--out") args.output_file = argv[++i];
-        else if(act_param=="--moving_t") args.R0 = std::stoi(argv[++i]);
+        else if(act_param=="--contact_mtx") args.contact_mtx = argv[++i];
+        else if(act_param=="--moving_t") args.moving_t = std::stoi(argv[++i]);
         else if(act_param=="--R0") args.R0 = std::stod(argv[++i]);
         else if(act_param=="--r1") args.r1 = std::stod(argv[++i]);
         else if(act_param=="--r2") args.r2 = std::stod(argv[++i]);
@@ -189,7 +191,7 @@ int main(int argc, char *argv[])
     vector<vector<double>> Nk = parser.parse_compartments("N");
 
     // contacts (home, other)
-    vector<vector<double>> C1 = parser.parse_contacts(1);
+    vector<vector<double>> C1 = parser.parse_contacts(args.contact_mtx);
     vector<vector<double>> C2 = parser.parse_contacts(2);
 
     vector<double> r1,r2;
@@ -221,6 +223,9 @@ int main(int argc, char *argv[])
     vector<vector<double>> Lnext(Npop, vector<double>(K, 0.0));
     vector<vector<double>> Inext(Npop, vector<double>(K, 0.0));
     vector<vector<double>> Rnext(Npop, vector<double>(K, 0.0));
+    
+    vector<vector<double>> I_new(Npop, vector<double>(K, 0.0));
+    
     double newL = 0.0;
     double newI = 0.0;
     double newR = 0.0;
@@ -266,6 +271,7 @@ int main(int argc, char *argv[])
 
                 // L -> I
                 newI = binomial(L[i][k], eps);
+                I_new[i][k]=newI;
 
                 // I -> R
                 newR = binomial(I[i][k], mu);
@@ -287,7 +293,8 @@ int main(int argc, char *argv[])
                 L[i][k] = Lnext[i][k];
                 I[i][k] = Inext[i][k];
                 R[i][k] = Rnext[i][k];
-                resFile << I[i][k] << "," << R[i][k] << ",";
+                resFile << I_new[i][k] << "," << R[i][k] << ",";
+                //resFile << I[i][k] << "," << R[i][k] << ",";
             }
         }
         resFile << "\n";
