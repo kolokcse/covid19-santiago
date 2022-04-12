@@ -32,10 +32,14 @@ class Parser
     }
 
     
-    int parse_Npop()
-    {
+    int parse_Npop(){
         string Npop = jf["Npop"];
         return stoi(Npop);
+    }
+
+    int parse_K(){
+        string K = jf["K"];
+        return stoi(K);
     }
 
 

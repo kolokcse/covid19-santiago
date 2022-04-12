@@ -5,3 +5,4 @@ code/output/sim/
 code/output
 *.gch
 *.out
+*.csv
