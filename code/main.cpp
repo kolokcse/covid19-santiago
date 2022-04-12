@@ -164,9 +164,9 @@ int main(int argc, char *argv[])
     // number of comunas, age groups, and simulations per parameters
     int Npop = parser.parse_Npop();
     // Number of age categories
-    int K = 16;
+    int K = parser.parse_K();
 
-    std::cout<<Npop<<std::endl;
+    std::cout<<Npop<<" "<<K<<std::endl;
 
     // parameters
     double mu = 1 / 2.5;
