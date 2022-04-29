@@ -17,6 +17,8 @@ struct Args{
     double r2 = 1.0;
     unsigned int maxT = 175;
     double c = 0.0;
+    int second_wave = -1;
+    double second_ratio = 1.0;
 };
 
 void read_args(int argc, char* argv[], Args& args){
@@ -34,6 +36,8 @@ void read_args(int argc, char* argv[], Args& args){
         else if(act_param=="--r2") args.r2 = std::stod(argv[++i]);
         else if(act_param=="--maxT") args.maxT = std::stoi(argv[++i]);
         else if(act_param=="--c") args.c = std::stod(argv[++i]);
+        else if(act_param=="--second_wave") args.second_wave = std::stoi(argv[++i]);
+        else if(act_param=="--second_ratio") args.second_ratio = std::stod(argv[++i]);
         //else if(act_param=="--verbose"){ args.verbose=true;++i;}
     }
 }
@@ -107,13 +111,14 @@ double get_Nk_eff(int pop_idx, int age_idx, double tau, vector<vector<double>> &
 double get_lambda(int pop_idx, int age_idx, double tau, double beta, vector<vector<double>> &Nk_eff, vector<vector<double>> &I, vector<vector<double>> &C, vector<vector<double>> &sigmas, vector<double> &sigmas_j)
 {
     double lambda = 0.0;
-    for (int i = 0; i < I.size(); i++)
+    for (int i = 0; i < I.size(); i++){
         if (i == pop_idx)
             for (int k = 0; k < I[0].size(); k++)
                 lambda += (C[age_idx][k] / Nk_eff[pop_idx][k]) * (I[pop_idx][k] / (1 + sigmas_j[pop_idx] / tau));
         else
             for (int k = 0; k < I[0].size(); k++)
                 lambda += (C[age_idx][k] / Nk_eff[pop_idx][k]) * (I[i][k] / (1 + sigmas_j[i] / tau)) * (sigmas[i][pop_idx] / tau);
+    }
     lambda = lambda * beta;
     return lambda;
 }
@@ -129,8 +134,7 @@ double get_lambda_tot(int pop_idx, int age_idx, double tau, double beta, vector<
     double lambda_jj = get_lambda(pop_idx, age_idx, tau, beta, Nk_eff, I, C[pop_idx], sigmas, sigmas_j);
     lambda_tot += lambda_jj / (1 + sigmas_j[pop_idx] / tau);
 
-    for (int i = 0; i < I.size(); i++)
-    {
+    for (int i = 0; i < I.size(); i++){
         lambda_ji = get_lambda(i, age_idx, tau, beta, Nk_eff, I, C[i], sigmas, sigmas_j);
         lambda_tot += lambda_ji / (1 + sigmas_j[pop_idx] / tau) * (sigmas[pop_idx][i] / tau);
     }
@@ -147,9 +151,32 @@ void update_moving(
     vector<vector<vector<double>>>& C,
     vector<vector<double>>& C1,
     vector<vector<double>>& C2,
-    vector<double>& r){
-    
-}
+    vector<double>& r){}
+
+void init_second_wave(
+    int Npop,
+    int K,
+    double inf_ratio,
+    vector<vector<double>>& L,
+    vector<vector<double>>& L2,
+    vector<vector<double>>& I,
+    vector<vector<double>>& I2){
+    for (int i = 0; i < Npop; i++){
+        for (int k = 0; k < K; k++){
+            //continue;
+            //double newL = binomial(L[i][k], inf_ratio);
+            //double newI = binomial(I[i][k], inf_ratio);
+            double newL = 1;
+            double newI = 1;
+
+            L2[i][k] += newL;
+            I2[i][k] += newI;
+
+            L[i][k] -= newL;
+            I[i][k] -= newI;
+        }
+    }
+} 
 
 /**
  * Main
@@ -190,6 +217,9 @@ int main(int argc, char *argv[])
     vector<vector<double>> R = parser.parse_compartments("R");
     vector<vector<double>> Nk = parser.parse_compartments("N");
 
+    vector<vector<double>> L2 = vector<vector<double>>(Npop, vector<double>(K, 0));
+    vector<vector<double>> I2 = vector<vector<double>>(Npop, vector<double>(K, 0));
+
     // contacts (home, other)
     vector<vector<double>> C1 = parser.parse_contacts(args.contact_mtx);
     vector<vector<double>> C2 = parser.parse_contacts(2);
@@ -228,21 +258,37 @@ int main(int argc, char *argv[])
     
     double newL = 0.0;
     double newI = 0.0;
-    double newR = 0.0;
-    double lambda = 0.0;
+
+    // === Second compartment ===
+    vector<vector<double>> I2next(Npop, vector<double>(K, 0.0));
+    vector<vector<double>> L2next(Npop, vector<double>(K, 0.0));
+    vector<vector<double>> I2_new(Npop, vector<double>(K, 0.0));
+    vector<vector<double>> L2_new(Npop, vector<double>(K, 0.0));
+    double newL2 = 0.0;
+    double newI2 = 0.0;
 
     // write results header
     ofstream resFile(args.output_file);
-    for (int i = 0; i < Npop; i++)
-        for (int k = 0; k < K; k++)
-            resFile << "I_" << to_string(i) << "_" << to_string(k) << "," << "R_" << to_string(i) << "_" << to_string(k) << "," ;
+    for (int i = 0; i < Npop; i++){
+        for (int k = 0; k < K; k++){
+            resFile << "I_" << to_string(i) << "_" << to_string(k) << "," ;
+            resFile << "I2_" << to_string(i) << "_" << to_string(k) << "," ;
+            resFile << "R_" << to_string(i) << "_" << to_string(k) << ",";
+        }
+    }
     resFile << "\n";
 
     std::cout << "Start Simulation" << '\n';
     // simulate
     int T0 = 243;
+    double lambda = 0.0;
     for (int t = T0; t < T0+args.maxT; t++)
     {
+        if(t == T0+args.second_wave){
+            std::cout<<"Second wave\n";
+            init_second_wave(Npop, K, 0.01, L,L2,I,I2);
+        }
+
         std::cout<<"\r"<<t<<"    "<<std::flush;
         if (t == args.moving_t){ // restrictions
             C.clear();
@@ -261,26 +307,38 @@ int main(int argc, char *argv[])
         }
 
         double act_beta = beta*seasonality(args.c, t);
-        for (int i = 0; i < Npop; i++)
-        {
-            for (int k = 0; k < K; k++)
-            {
+        double act_beta2 = t > args.second_wave ? act_beta*args.second_ratio : act_beta;
+        for (int i = 0; i < Npop; i++){
+            for (int k = 0; k < K; k++){
                 // S -> L
                 lambda = get_lambda_tot(i, k, tau, act_beta, Nk_eff, I, C, sigmas, sigmas_j);
                 newL = binomial(S[i][k], lambda);
 
+                double lambda2 = get_lambda_tot(i, k, tau, act_beta2, Nk_eff, I2, C, sigmas, sigmas_j); // TODO ratio of 1. and 2. wave  || !!! 
+                newL2 += binomial(S[i][k]-newL, lambda2); // TODO metszet levon
+                //newL2 += binomial(S[i][k]-newL, lambda2); // TODO metszet levon
+
                 // L -> I
                 newI = binomial(L[i][k], eps);
                 I_new[i][k]=newI;
+                // TODO other latent...
+                newI2 = binomial(L2[i][k], eps);
+                I2_new[i][k]=newI2;
 
                 // I -> R
-                newR = binomial(I[i][k], mu);
+                double newR1 = binomial(I[i][k], mu);
+                double newR2 = binomial(I2[i][k], mu);
 
                 // update
-                Snext[i][k] = S[i][k] - newL;
+                Snext[i][k] = S[i][k] - newL - newL2;
+
                 Lnext[i][k] = L[i][k] + newL - newI;
-                Inext[i][k] = I[i][k] + newI - newR;
-                Rnext[i][k] = R[i][k] + newR;
+                Inext[i][k] = I[i][k] + newI - newR1;
+
+                L2next[i][k] = L2[i][k] + newL2 - newI2;
+                I2next[i][k] = I2[i][k] + newI2 - newR2;
+
+                Rnext[i][k] = R[i][k] + newR1 + newR2;
             }
         }
 
@@ -293,7 +351,10 @@ int main(int argc, char *argv[])
                 L[i][k] = Lnext[i][k];
                 I[i][k] = Inext[i][k];
                 R[i][k] = Rnext[i][k];
-                resFile << I_new[i][k] << "," << R[i][k] << ",";
+
+                L2[i][k] = L2next[i][k];
+                I2[i][k] = I2next[i][k];
+                resFile << I_new[i][k] << "," << I2_new[i][k] << "," << R[i][k] << ",";
                 //resFile << I[i][k] << "," << R[i][k] << ",";
             }
         }

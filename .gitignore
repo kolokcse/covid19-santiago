@@ -2,7 +2,7 @@
 data/hun
 */bin/main
 code/output/sim/
-code/output
+code/output/
 *.gch
 *.out
 *.csv
