@@ -164,10 +164,10 @@ void init_second_wave(
     for (int i = 0; i < Npop; i++){
         for (int k = 0; k < K; k++){
             //continue;
-            //double newL = binomial(L[i][k], inf_ratio);
-            //double newI = binomial(I[i][k], inf_ratio);
-            double newL = 1;
-            double newI = 1;
+            double newL = binomial(L[i][k], inf_ratio);
+            double newI = binomial(I[i][k], inf_ratio);
+            //double newL = 1;
+            //double newI = 1;
 
             L2[i][k] += newL;
             I2[i][k] += newI;
@@ -307,7 +307,7 @@ int main(int argc, char *argv[])
         }
 
         double act_beta = beta*seasonality(args.c, t);
-        double act_beta2 = t > args.second_wave ? act_beta*args.second_ratio : act_beta;
+        double act_beta2 = t >= T0+args.second_wave ? act_beta*args.second_ratio : act_beta;
         for (int i = 0; i < Npop; i++){
             for (int k = 0; k < K; k++){
                 // S -> L
@@ -315,8 +315,9 @@ int main(int argc, char *argv[])
                 newL = binomial(S[i][k], lambda);
 
                 double lambda2 = get_lambda_tot(i, k, tau, act_beta2, Nk_eff, I2, C, sigmas, sigmas_j); // TODO ratio of 1. and 2. wave  || !!! 
-                newL2 += binomial(S[i][k]-newL, lambda2); // TODO metszet levon
+                newL2 = binomial(S[i][k], lambda2); // TODO metszet levon
                 //newL2 += binomial(S[i][k]-newL, lambda2); // TODO metszet levon
+                //if(t >= T0+args.second_wave) std::cout<<newL<< " "<<newL2<<"\n";
 
                 // L -> I
                 newI = binomial(L[i][k], eps);
@@ -343,6 +344,7 @@ int main(int argc, char *argv[])
         }
 
         // update next step data and write results
+        double Lall = 0.0;
         for (int i = 0; i < Npop; i++)
         {
             for (int k = 0; k < K; k++)
@@ -356,9 +358,12 @@ int main(int argc, char *argv[])
                 I2[i][k] = I2next[i][k];
                 resFile << I_new[i][k] << "," << I2_new[i][k] << "," << R[i][k] << ",";
                 //resFile << I[i][k] << "," << R[i][k] << ",";
+
+                Lall += L2[i][k];
             }
         }
         resFile << "\n";
+        //std::cout<<Lall<<std::endl;
     }
     std::cout << "End of Simulation" << '\n';
     return 0;

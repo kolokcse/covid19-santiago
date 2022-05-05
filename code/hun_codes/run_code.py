@@ -24,7 +24,7 @@ def run(args, job_count, lock):
 
 def measure(meas_name, arg_name, arg_space):
     # Init pool
-    pool = multiprocessing.Pool(processes=global_args["procnum"])
+    pool = multiprocessing.Pool(processes=min(global_args["procnum"], len(arg_space)))
     manager = multiprocessing.Manager()
     lock = manager.Lock()
     job_count = manager.Array("i", [0,len(arg_space)])
@@ -52,43 +52,17 @@ def measure(meas_name, arg_name, arg_space):
     
     return sims.keys()
 
-"""
-def convert_ages(arr):
-    # Split first age into 3
-    ret = [arr[0], arr[0], arr[0]]
-    # Then split the others into 2 category
-    for e in arr[1:-1]:
-        ret += [e,e]
-    # Finally add the last
-    ret += [arr[-1]]
-    return ret
-
-def get_inf_curve(filename, death = None):
-    df = pd.read_csv(filename, sep=',')
-    inf_cols = [c for c in df.columns if c[0]=='I']
-    Is = df.filter(inf_cols, axis=1)
-    
-    I = np.zeros((150, 16, len(Is.columns)//16))
-    for c in Is.columns:
-        _,city,age = c.split("_")
-        I[:,int(age), int(city)] = Is.loc[:, c]
-    
-    I = np.sum(I, axis=2)
-    if type(death) != None:
-        return np.sum(I*death, axis=1), Is.sum(axis=1)
-    else:
-        return Is.sum(axis=1)
-"""
-
 base_args = {
     "--config": "../input/hun",
-    "--out": "../output/sim/temp.txt",
-    "--maxT": "150",
-    "--c": "0.25" # Seasonality
+    "--maxT": "160",
+    "--R0":2.0,
+    "--second_ratio":3.0,
+    "--second_wave":80,
 }
 
 global_args = {
     "procnum": 20,
 }
 
-sims_R0 = measure("R0_K2", "--R0", np.linspace(1.5, 2.5, 20))
+#sims_F = measure("second_wave/second_T1:80_R0:2.0", "--second_ratio", [3.0, 3.5, 4.0])
+sims_R0 = measure("second_wave/second_T1:80_F:3.0", "--R0", np.linspace(2.0, 2.6, 10))
