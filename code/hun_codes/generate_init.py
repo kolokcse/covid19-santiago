@@ -1,3 +1,4 @@
+import os
 import json
 import numpy as np
 import pandas as pd
@@ -40,14 +41,14 @@ def get_age(row, korfa_teltip, I, L, Ks):
     ages = [{"N": int(s), "S":int(s-i-l), "L":int(l), "I":int(i), "R":0} for s,l,i in zip(ages,Ls,Is)]
     return ages
 
-def create_population_dict(sett_types, population_th, num_I, num_L, Ks, budapest):
+def create_population_dict(sett_types, population_th, num_I, num_L, Ks, budapest, out):
     # === Restrict to small cities ===
-    small_cities = sett_types[sett_types["population"]>population_th]
-    small_cities = small_cities[small_cities["place"] != "Budapest"]
+    big_cities = sett_types[sett_types["population"]>population_th]
+    big_cities = big_cities[big_cities["place"] != "Budapest"]
 
-    pop = np.array(list(small_cities["population"].array))
+    pop = np.array(list(big_cities["population"].array))
     if budapest:
-        for i,c in enumerate(small_cities["place"].array):
+        for i,c in enumerate(big_cities["place"].array):
             if c[:8] != "Budapest":
                 pop[i] = 0 
     
@@ -57,11 +58,11 @@ def create_population_dict(sett_types, population_th, num_I, num_L, Ks, budapest
     
     place_id_dict = {}
     population = {"populations":[]}
-    for ind, (_, row) in enumerate(small_cities.iterrows()):
+    for ind, (_, row) in enumerate(big_cities.iterrows()):
         city = {
             "name": str(ind),
-            "city":row["place"],
             #"name": row["place"],
+            "city":row["place"],
             "index": ind,
             "N": row["population"],
             "r1":1.0,
@@ -71,24 +72,74 @@ def create_population_dict(sett_types, population_th, num_I, num_L, Ks, budapest
         place_id_dict[row['place']] = ind
         population["populations"].append(city)
     
-    with open("../input/hun/populations_KSH.json", "w") as f:
+    with open(f"../input/{out}/populations_KSH.json", "w") as f:
         f.write(json.dumps(population))
-    return population, set(small_cities['place']), place_id_dict
+    
+    district_pops, district_id_dict = generate_district_pop_dict(population, big_cities, out=f"{out}/district")
+    
+    return population, place_id_dict, big_cities, district_pops, district_id_dict
+
+def add_ages(ages1, ages2):
+    ages = []
+
+    for a1,a2 in zip(ages1, ages2):
+        ages.append({"N":a1["N"]+a2["N"], "S":a1["S"]+a2["S"], "L":a1["L"]+a2["L"], "I":a1["I"]+a2["I"], "R":a1["R"]+a2["R"]})
+    return ages
+
+def generate_district_pop_dict(populations, big_cities, out):
+    all_district = set(big_cities["admin municip"])
+    get_district = big_cities.set_index('place').to_dict()["admin municip"]
+
+    pops = {}
+    district_id_dict = {}
+    for ind,d in enumerate(all_district):
+        district_id_dict[d]=ind
+        dist = {
+            "name":str(ind),
+            "district":d,
+            "index":ind,
+            "N":0,
+            "r1":1.0,
+            "r2":1.0,
+            "age": None
+        }
+        pops[d]=dist
+    
+    for city in populations["populations"]:
+        dist_name = get_district[city["city"]]
+        pops[dist_name]["N"] += city["N"]
+        if pops[dist_name]["age"] == None:
+            pops[dist_name]["age"] = city["age"]
+        else:
+            pops[dist_name]["age"] = add_ages(pops[dist_name]["age"], city["age"])
+
+    with open(f"../input/{out}/populations_KSH.json", "w") as f:
+        f.write(json.dumps({"populations":list(pops.values())}))
+    
+    return pops, district_id_dict
 
 # === Commuting ===
-def create_commuting(cities):
+def create_commuting(cities, place_id_dict, big_cities, district_pops, district_id_dict, out):
     N = len(cities)
+    M = len(district_id_dict)
     pop_dict = {row['place']:row["population"] for _,row in sett_types.iterrows()}
 
-    edges = {}
+
+    get_district = big_cities.set_index('place').to_dict()["admin municip"]
+
     mtx = np.zeros((N,N))
+    mtx_dist = np.zeros((M,M))
     for _,row in KSH.iterrows():
         weight = row["CommutersAll"]
         orig,dest = row["origName"], row["destName"]
         if((orig in cities) and (dest in cities)):
-            edges[(place_id_dict[orig], place_id_dict[dest])] = weight/pop_dict[orig]
             mtx[place_id_dict[orig], place_id_dict[dest]] = weight/pop_dict[orig]
+            a = district_id_dict[get_district[orig]]
+            b = district_id_dict[get_district[dest]]
+            mtx_dist[a,b] += weight
     
+    for d,ind in district_id_dict.items():
+        mtx[ind]/= district_pops[d]["N"]
 
     network = [{"from":i, "to":j, "weight":mtx[i,j]} for i,j in itertools.product(range(N), range(N)) if i!= j]
     commuting = {
@@ -96,8 +147,18 @@ def create_commuting(cities):
         "network":network
     }
 
-    with open("../input/hun/commuting_KSH.json", "w") as f:
+    print("Districts: ",M)
+    network_dist = [{"from":i, "to":j, "weight":mtx_dist[i,j]} for i,j in itertools.product(range(M), range(M)) if i!= j]
+    commuting_dist = {
+        "N":M,
+        "network":network_dist
+    }
+
+    with open(f"../input/{out}/commuting_KSH.json", "w") as f:
         f.write(json.dumps(commuting))
+    
+    with open(f"../input/{out}/district/commuting_KSH.json", "w") as f:
+        f.write(json.dumps(commuting_dist))
 
 # === Create contats_home and contacts other ===
 import itertools
@@ -113,16 +174,16 @@ def select_specified_ages(mtx):
         new[i,j] = np.mean(mtx[a:b+1,c:d+1])
     return new
 
-def write_mtx(mtx, name):
+def write_mtx(mtx, name, out):
     N = len(mtx)
     d = {
         "K":len(mtx),
         "rates": [{"from":i,"to":j, 'rate':mtx[i,j]} for i,j in itertools.product(range(N), range(N))]
     }
-    with open(f"../input/hun/contacts_{name}.json", "w") as f:
+    with open(f"../input/{out}/contacts_{name}.json", "w") as f:
         f.write(json.dumps(d))
 
-def create_new_contact_mtx():
+def create_new_contact_mtx(out):
     d = json.load(open("../input/santiago/contacts_home.json"))
     K = int(d['K'])
     mtx_home = np.zeros((K,K))
@@ -137,23 +198,47 @@ def create_new_contact_mtx():
     
     new_home = select_specified_ages(mtx_home)
     new_other = select_specified_ages(mtx_other)
-    write_mtx(new_home, "home")
-    write_mtx(new_other, "other")
+    write_mtx(new_home, "home", out)
+    write_mtx(new_other, "other", out)
+
+    write_mtx(new_home, "home", f"{out}/district")
+    write_mtx(new_other, "other", f"{out}/district")
+
+def create_config(N, K, out):
+    d = {
+        "commuting_file": "commuting_KSH.json",
+        "populations_file": "populations_KSH.json",
+        "contacts_file_home": "contacts_home.json",
+        "contacts_file_other": "contacts_other.json",
+        "Npop": str(N[0]),
+        "K":str(K)
+    }
+    with open(f"../input/{out}/config.json", "w") as f:
+        f.write(json.dumps(d, indent=4))
+    
+    d["Npop"] = str(N[1])
+    with open(f"../input/{out}/district/config.json", "w") as f:
+        f.write(json.dumps(d, indent=4))
 
 # === MAIN ===
-pops,cities,place_id_dict = create_population_dict(
-    sett_types, population_th=10000,
-    num_I =10000,
+th = 1000
+dest_folder = f"hun_{th}"
+if(not os.path.exists(f"../input/{dest_folder}/district")):
+    os.makedirs(f"../input/{dest_folder}/district")
+
+np.random.seed(0)
+population, place_id_dict, big_cities, district_pops, district_id_dict = create_population_dict(
+    sett_types, population_th=th,
+    num_I = 10000,
     num_L=int(10000*(4/2.5)),
     Ks = [4,5],
-    budapest = False)
+    budapest = False,
+    out=dest_folder)
 
+cities = set(place_id_dict.keys())
 print(f"Number of cities: {len(cities)}")
-print(f'Number of age groups {len(pops["populations"][1]["age"])}')
+print(f'Number of age groups {len(population["populations"][1]["age"])}')
 
-create_commuting(cities)
-create_new_contact_mtx()
-#print(cities)    
-
-
-
+create_commuting(cities, place_id_dict, big_cities, district_pops, district_id_dict, out=dest_folder)
+create_new_contact_mtx(out=dest_folder)
+create_config(N=(len(cities), len(district_id_dict)), K=8, out=dest_folder)
