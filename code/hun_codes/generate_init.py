@@ -4,8 +4,9 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import itertools
+from scipy import linalg
 
-
+# === DATA ===
 sett_types = pd.read_csv("../../data/hun/HU_places_admin_pop_ZIP_latlon.csv",
            sep=',',
            header=0)
@@ -75,7 +76,7 @@ def create_population_dict(sett_types, population_th, num_I, num_L, Ks, budapest
     with open(f"../input/{out}/populations_KSH.json", "w") as f:
         f.write(json.dumps(population))
     
-    district_pops, district_id_dict = generate_district_pop_dict(population, big_cities, out=f"{out}/district")
+    district_pops, district_id_dict = generate_district_pop_dict(population, big_cities, out=f"{out}")
     
     return population, place_id_dict, big_cities, district_pops, district_id_dict
 
@@ -113,10 +114,44 @@ def generate_district_pop_dict(populations, big_cities, out):
         else:
             pops[dist_name]["age"] = add_ages(pops[dist_name]["age"], city["age"])
 
-    with open(f"../input/{out}/populations_KSH.json", "w") as f:
+    with open(f"../input/{out}/district/populations_KSH.json", "w") as f:
+        f.write(json.dumps({"populations":list(pops.values())}))
+    
+    with open(f"../input/{out}/district_eigen/populations_KSH.json", "w") as f:
         f.write(json.dumps({"populations":list(pops.values())}))
     
     return pops, district_id_dict
+
+def get_eigen_mtx(mtx, district_ind, pop):
+    """
+    Description:
+        Returns the eig.vals enhanced district aggregated mtx
+    Parameters:
+        * mtx          : commutation mtx between cities
+        * district_ind : district dictionary, containing the cities in the district
+        * pop          : population of each city
+    """
+    A = np.array([mtx[:,j]*pop[j] for j in range(len(mtx))])
+    #phi = np.linalg.eigvals(A)
+    eigvals, eigenVectors = np.linalg.eig(mtx)
+    phi = np.real(eigenVectors[0])
+    phi = phi/np.sum(phi)
+    print("Largest eigenvalue:", eigvals[0])
+    
+    mtx_d = np.zeros((len(district_ind), len(district_ind)))
+    for l,k in itertools.product(district_ind.keys(), district_ind.keys()):
+        up = 0
+        for i,j in itertools.product(district_ind[l], district_ind[k]):
+            up +=  mtx[i,j]*phi[j]
+            #up +=  mtx[i,j]*phi[j]*pop[i]*pop[j]
+        
+        down = sum([phi[j]*pop[j] for j in district_ind[j]])
+        mk = sum([pop[i] for i in district_ind[k]])
+        ml = sum([pop[i] for i in district_ind[l]])
+        
+        mtx_d[l,k] = ml*up/down
+    
+    return mtx_d
 
 # === Commuting ===
 def create_commuting(cities, place_id_dict, big_cities, district_pops, district_id_dict, out):
@@ -140,13 +175,15 @@ def create_commuting(cities, place_id_dict, big_cities, district_pops, district_
     
     for d,ind in district_id_dict.items():
         mtx[ind]/= district_pops[d]["N"]
-
+    
+    # === CITY COMMUTATION ===
     network = [{"from":i, "to":j, "weight":mtx[i,j]} for i,j in itertools.product(range(N), range(N)) if i!= j]
     commuting = {
         "N":N,
         "network":network
     }
 
+    # === DISTRICT COMMUTATION ===
     print("Districts: ",M)
     network_dist = [{"from":i, "to":j, "weight":mtx_dist[i,j]} for i,j in itertools.product(range(M), range(M)) if i!= j]
     commuting_dist = {
@@ -154,11 +191,30 @@ def create_commuting(cities, place_id_dict, big_cities, district_pops, district_
         "network":network_dist
     }
 
+    # === EIGEN DISTRICT COMMUTATION ===
+    district_ind = {i:[] for i in range(len(mtx_dist))}
+    pop = np.zeros(len(mtx))
+    for city in cities:
+        pop[place_id_dict[city]] = pop_dict[city]
+        
+        act_dist = district_id_dict[get_district[city]]
+        district_ind[act_dist].append(act_dist)
+    
+    mtx_eigen = get_eigen_mtx(mtx, district_ind, pop)
+    network_eigen = [{"from":i, "to":j, "weight":mtx_eigen[i,j]} for i,j in itertools.product(range(M), range(M)) if i!= j]
+    commuting_eigen = {
+        "N":M,
+        "network":network_eigen
+    }
+
     with open(f"../input/{out}/commuting_KSH.json", "w") as f:
         f.write(json.dumps(commuting))
     
     with open(f"../input/{out}/district/commuting_KSH.json", "w") as f:
         f.write(json.dumps(commuting_dist))
+    
+    with open(f"../input/{out}/district_eigen/commuting_KSH.json", "w") as f:
+        f.write(json.dumps(commuting_eigen))
 
 # === Create contats_home and contacts other ===
 import itertools
@@ -204,6 +260,9 @@ def create_new_contact_mtx(out):
     write_mtx(new_home, "home", f"{out}/district")
     write_mtx(new_other, "other", f"{out}/district")
 
+    write_mtx(new_home, "home", f"{out}/district_eigen")
+    write_mtx(new_other, "other", f"{out}/district_eigen")
+
 def create_config(N, K, out):
     d = {
         "commuting_file": "commuting_KSH.json",
@@ -219,14 +278,18 @@ def create_config(N, K, out):
     d["Npop"] = str(N[1])
     with open(f"../input/{out}/district/config.json", "w") as f:
         f.write(json.dumps(d, indent=4))
-
+    with open(f"../input/{out}/district_eigen/config.json", "w") as f:
+        f.write(json.dumps(d, indent=4))
 # === MAIN ===
-th = 1000
+th = 5000
 dest_folder = f"hun_{th}"
 if(not os.path.exists(f"../input/{dest_folder}/district")):
     os.makedirs(f"../input/{dest_folder}/district")
+if(not os.path.exists(f"../input/{dest_folder}/district_eigen")):
+    os.makedirs(f"../input/{dest_folder}/district_eigen")
 
-np.random.seed(0)
+np.random.seed(1)
+# Creates nodes with SEIR states, with given infection distribution
 population, place_id_dict, big_cities, district_pops, district_id_dict = create_population_dict(
     sett_types, population_th=th,
     num_I = 10000,
