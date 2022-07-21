@@ -122,7 +122,7 @@ def generate_district_pop_dict(populations, big_cities, out):
     
     return pops, district_id_dict
 
-def get_eigen_mtx(mtx, district_ind, pop):
+def get_eigen_mtx(mtx, district_ind, pop, out):
     """
     Description:
         Returns the eig.vals enhanced district aggregated mtx
@@ -133,10 +133,14 @@ def get_eigen_mtx(mtx, district_ind, pop):
     """
     A = np.array([mtx[:,j]*pop[j] for j in range(len(mtx))])
     #phi = np.linalg.eigvals(A)
-    eigvals, eigenVectors = np.linalg.eig(mtx)
-    phi = np.real(eigenVectors[0])
+    eigvals, eigenVectors = np.linalg.eig(A)
+    phi = np.real(eigenVectors[:,0])
     phi = phi/np.sum(phi)
     print("Largest eigenvalue:", eigvals[0])
+    #print(list(phi))
+    with open(f"../input/{out}/{th}.npy", "wb")as file:
+        np.save(file, np.array(phi))
+    
     
     mtx_d = np.zeros((len(district_ind), len(district_ind)))
     for l,k in itertools.product(district_ind.keys(), district_ind.keys()):
@@ -149,7 +153,8 @@ def get_eigen_mtx(mtx, district_ind, pop):
         mk = sum([pop[i] for i in district_ind[k]])
         ml = sum([pop[i] for i in district_ind[l]])
         
-        mtx_d[l,k] = ml*up/down
+        if(down < 1e-12): mtx_d[l,k] = 0.0
+        else: mtx_d[l,k] = ml*up/down
     
     return mtx_d
 
@@ -200,7 +205,14 @@ def create_commuting(cities, place_id_dict, big_cities, district_pops, district_
         act_dist = district_id_dict[get_district[city]]
         district_ind[act_dist].append(act_dist)
     
-    mtx_eigen = get_eigen_mtx(mtx, district_ind, pop)
+    city_names = ["" for i in range(N)]
+    for city in place_id_dict:
+        city_names[place_id_dict[city]] = city
+    #print(city_names)
+    with open(f"../input/{out}/{th}_cities.npy", "wb")as file:
+        np.save(file, np.array(city_names))
+    
+    mtx_eigen = get_eigen_mtx(mtx, district_ind, pop, out)
     network_eigen = [{"from":i, "to":j, "weight":mtx_eigen[i,j]} for i,j in itertools.product(range(M), range(M)) if i!= j]
     commuting_eigen = {
         "N":M,
@@ -281,7 +293,7 @@ def create_config(N, K, out):
     with open(f"../input/{out}/district_eigen/config.json", "w") as f:
         f.write(json.dumps(d, indent=4))
 # === MAIN ===
-th = 5000
+th = 10000
 dest_folder = f"hun_{th}"
 if(not os.path.exists(f"../input/{dest_folder}/district")):
     os.makedirs(f"../input/{dest_folder}/district")

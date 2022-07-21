@@ -68,9 +68,10 @@ global_args = {
 
 #sims_F = measure("second_wave/second_T1:80_R0:2.0", "--second_ratio", [3.0, 3.5, 4.0])
 #sims_R0 = measure("second_wave/second_T1:100_F:2.5_s:0.25", "--R0", np.linspace(2.0, 2.6, 10))
-for th in [5000]:
-    base_args["--config"] = f"../input/hun_{th}"
-    measure(f"KSH2_{th}/base", "--R0", np.linspace(2.0, 2.6, 10))
+#for th in [10000,5000]:
+for th in [1000]:
+    #base_args["--config"] = f"../input/hun_{th}"
+    #measure(f"KSH2_{th}/base", "--R0", np.linspace(2.0, 2.6, 10))
     base_args["--config"] = f"../input/hun_{th}/district"
     measure(f"KSH2_{th}/district", "--R0", np.linspace(2.0, 2.6, 10))
     base_args["--config"] = f"../input/hun_{th}/district_eigen"

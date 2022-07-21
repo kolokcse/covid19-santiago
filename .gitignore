@@ -6,3 +6,5 @@ code/output/
 *.gch
 *.out
 *.csv
+*.npy
+code/input
