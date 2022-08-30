@@ -3,4 +3,5 @@
   "populations_file": "populations.json",
   "contacts_file_home": "contacts_home.json",
   "contacts_file_other": "contacts_other.json",
-  "Npop":"39"}
+  "Npop":"39",
+  "K":"16"}
