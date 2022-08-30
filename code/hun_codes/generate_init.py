@@ -11,8 +11,9 @@ sett_types = pd.read_csv("../../data/hun/HU_places_admin_pop_ZIP_latlon.csv",
            sep=',',
            header=0)
 KSH = pd.read_csv("../../data/hun/KSHCommuting_c1ID_c1name_c2ID_c2name_comm_school_work_DIR.csv",
-           sep=',',
-           header=0)
+           sep=',', header=0)
+#KSH = pd.read_csv("../../data/hun/KSHCommuting_c1ID_c1name_c2ID_c2name_comm_school_work_UNDIR.csv",
+#           sep=',', header=0)
 
 korfa_teltip1 = {
     "főváros": [210640, 81626, 246127, 313540, 213367, 225379, 216828, 221533, 1729040],
@@ -136,7 +137,8 @@ def get_eigen_mtx(mtx, district_ind, pop, out):
     eigvals, eigenVectors = np.linalg.eig(A)
     phi = np.real(eigenVectors[:,0])
     phi = phi/np.sum(phi)
-    print("Largest eigenvalue:", eigvals[0])
+    print("Largest eigenvalue:", eigvals[0], "gap %", 100*eigvals[1]/eigvals[0])
+    print(sorted(eigvals, reverse=True))
     #print(list(phi))
     with open(f"../input/{out}/{th}.npy", "wb")as file:
         np.save(file, np.array(phi))
@@ -158,6 +160,41 @@ def get_eigen_mtx(mtx, district_ind, pop, out):
     
     return mtx_d
 
+def get_eigen_mtx2(mtx, district_ind, pop, out):
+    """
+    Description:
+        Returns the eig.vals enhanced district aggregated mtx
+    Parameters:
+        * mtx          : commutation mtx between cities
+        * district_ind : district dictionary, containing the cities in the district
+        * pop          : population of each city
+    """
+    A = np.array([mtx[:,j] for j in range(len(mtx))])
+
+    eigvals, eigenVectors = np.linalg.eig(A)
+    phi = np.real(eigenVectors[:,0])
+    phi = phi/np.sum(phi)
+    print("Largest eigenvalue:", eigvals[0], "gap %", 100*eigvals[1]/eigvals[0])
+    print(sorted(eigvals, reverse=True))
+    with open(f"../input/{out}/{th}.npy", "wb")as file:
+        np.save(file, np.array(phi))
+    
+    
+    mtx_d = np.zeros((len(district_ind), len(district_ind)))
+    for l,k in itertools.product(district_ind.keys(), district_ind.keys()):
+        up = 0
+        for i,j in itertools.product(district_ind[l], district_ind[k]):
+            up +=  mtx[i,j]*phi[j]
+        
+        down = sum([phi[j]*pop[j] for j in district_ind[j]])
+        mk = sum([pop[i] for i in district_ind[k]])
+        ml = sum([pop[i] for i in district_ind[l]])
+        
+        if(down < 1e-12): mtx_d[l,k] = 0.0
+        else: mtx_d[l,k] = up/(len(district_ind[k])*np.sum([phi[j] for j in district_ind[k]]))
+    
+    return mtx_d
+
 # === Commuting ===
 def create_commuting(cities, place_id_dict, big_cities, district_pops, district_id_dict, out):
     N = len(cities)
@@ -173,13 +210,15 @@ def create_commuting(cities, place_id_dict, big_cities, district_pops, district_
         weight = row["CommutersAll"]
         orig,dest = row["origName"], row["destName"]
         if((orig in cities) and (dest in cities)):
-            mtx[place_id_dict[orig], place_id_dict[dest]] = weight/pop_dict[orig]
+            mtx[place_id_dict[orig], place_id_dict[dest]] += weight/pop_dict[orig]
+            mtx[place_id_dict[dest], place_id_dict[orig]] += weight/pop_dict[dest]
             a = district_id_dict[get_district[orig]]
             b = district_id_dict[get_district[dest]]
             mtx_dist[a,b] += weight
+            mtx_dist[b,a] += weight
     
     for d,ind in district_id_dict.items():
-        mtx[ind]/= district_pops[d]["N"]
+        mtx_dist[ind]/= district_pops[d]["N"]
     
     # === CITY COMMUTATION ===
     network = [{"from":i, "to":j, "weight":mtx[i,j]} for i,j in itertools.product(range(N), range(N)) if i!= j]
@@ -214,10 +253,7 @@ def create_commuting(cities, place_id_dict, big_cities, district_pops, district_
     
     mtx_eigen = get_eigen_mtx(mtx, district_ind, pop, out)
     network_eigen = [{"from":i, "to":j, "weight":mtx_eigen[i,j]} for i,j in itertools.product(range(M), range(M)) if i!= j]
-    commuting_eigen = {
-        "N":M,
-        "network":network_eigen
-    }
+    network_eigen_symm = [{"from":i, "to":j, "weight":(mtx_eigen[i,j]+mtx_eigen[j,i])/2} for i,j in itertools.product(range(M), range(M)) if i!= j]
 
     with open(f"../input/{out}/commuting_KSH.json", "w") as f:
         f.write(json.dumps(commuting))
@@ -226,7 +262,10 @@ def create_commuting(cities, place_id_dict, big_cities, district_pops, district_
         f.write(json.dumps(commuting_dist))
     
     with open(f"../input/{out}/district_eigen/commuting_KSH.json", "w") as f:
-        f.write(json.dumps(commuting_eigen))
+        f.write(json.dumps({"N":M, "network":network_eigen}))
+
+    with open(f"../input/{out}/district_eigen_symm/commuting_KSH.json", "w") as f:
+        f.write(json.dumps({"N":M, "network":network_eigen_symm}))
 
 # === Create contats_home and contacts other ===
 import itertools
