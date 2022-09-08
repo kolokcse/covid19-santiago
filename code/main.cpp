@@ -1,8 +1,8 @@
 #include <iostream>
 #include <vector>
 #include <cstdlib>
-#include "./include/sampler.h"
-#include "./include/Parser.h"
+#include "sampler.h"
+#include "Parser.h"
 #include <math.h>
 
 using namespace std;

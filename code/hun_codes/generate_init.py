@@ -332,7 +332,7 @@ def create_config(N, K, out):
     with open(f"../input/{out}/district_eigen/config.json", "w") as f:
         f.write(json.dumps(d, indent=4))
 # === MAIN ===
-th = 10000
+th = 5000
 dest_folder = f"hun_{th}"
 if(not os.path.exists(f"../input/{dest_folder}/district")):
     os.makedirs(f"../input/{dest_folder}/district")
