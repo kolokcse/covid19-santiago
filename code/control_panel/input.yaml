@@ -1,0 +1,22 @@
+---
+# Simulation parameters
+sim_id: 1
+age_groups: 8
+simulated_days: 300
+first_wave:
+  R0: 2.0
+second_wave:
+  time: 100
+  R0_ratio: 2.5
+seasonality: 0.25
+# TODO: doc
+network_config_folder: ../input/hun_10000
+simulation_file: sim.csv
+
+# Loss parameters
+loss:
+  type: mse
+  global_rate: 0.5
+
+death_rate: [0.00000000e+00, 3.36964689e-06, 2.19595034e-05, 4.49107573e-05,
+               1.88422215e-04, 4.99762978e-04, 1.89895681e-03, 7.40632275e-03]
