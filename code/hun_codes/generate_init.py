@@ -67,6 +67,8 @@ def create_population_dict(sett_types, population_th, num_I, num_L, Ks, budapest
             "city":row["place"],
             "index": ind,
             "N": row["population"],
+            "admin_municip":row["admin municip"],
+            "admin_county":row["admin county"],
             "r1":1.0,
             "r2":1.0,
             "age": get_age(row, korfa_teltip1, Is[ind], Ls[ind], Ks)
@@ -332,7 +334,7 @@ def create_config(N, K, out):
     with open(f"../input/{out}/district_eigen/config.json", "w") as f:
         f.write(json.dumps(d, indent=4))
 # === MAIN ===
-th = 5000
+th = 10000
 dest_folder = f"hun_{th}"
 if(not os.path.exists(f"../input/{dest_folder}/district")):
     os.makedirs(f"../input/{dest_folder}/district")
