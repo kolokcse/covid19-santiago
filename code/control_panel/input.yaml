@@ -11,7 +11,7 @@ second_wave:
 seasonality: 0.25
 # TODO: doc
 network_config_folder: ../input/hun_10000
-simulation_file: sim.csv
+simulation_file: log/sim.csv
 
 # Loss parameters
 loss:

@@ -63,6 +63,8 @@ def aggregate_county(pop_file, df, K, logger):
     for i in range(len(charts[0][1])):
         logger.add_scalars(f"County(I)", {county:chart[i] for county,chart in charts}, global_step=i)
     
+    df = pd.DataFrame({county:chart for county,chart in charts})
+    df.to_csv("log/county.csv")
     return network_size
 
 def aggregate_age(df, K, network_size, logger):
@@ -75,6 +77,10 @@ def aggregate_age(df, K, network_size, logger):
         
     for i in range(len(charts[0])):
         logger.add_scalars(f"Age(I)", {str(age): charts[age][i] for age in range(K)}, global_step=i)
+    
+    df = pd.DataFrame({str(age):charts[age] for age in range(K)})
+    df.to_csv("log/ages.csv")
+
 
 def aggregate_all(df, K, network_size, logger):
     # TODO multiply with death ratio
