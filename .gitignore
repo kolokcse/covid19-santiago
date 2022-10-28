@@ -8,3 +8,8 @@ code/output/
 *.csv
 *.npy
 code/input
+data/input
+*.xls
+*.ods
+code/hun_codes/scripts/plotlymap.ipynb
+code/hun_codes/scripts/Untitled.ipynb

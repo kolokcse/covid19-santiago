@@ -40,7 +40,7 @@ def measure(meas_name, arg_name, arg_space):
         else:
             x = np.round_(x, decimals=4)
         args = copy.copy(base_args)
-        args["--out"]=f"../output/{meas_name}/{i}.txt"
+        args["--out"]=f"/u/student/bsc/adug96/Epidemicmodel/covid19-santiago/code/output/{meas_name}/{i}.txt"
         args[arg_name]=f"{x}"
         sims[(x,args["--out"])] = pool.apply_async(run, args =(args, job_count, lock))
     
@@ -54,7 +54,7 @@ def measure(meas_name, arg_name, arg_space):
     return sims.keys()
 
 base_args = {
-    "--config": "../input/hun1/district",
+    "--config": "../input/hun1000/district",
     "--maxT": 300,
     "--R0":2.0,
     "--second_ratio":2.5,
@@ -63,16 +63,16 @@ base_args = {
 }
 
 global_args = {
-    "procnum": 20,
+    "procnum": 10,
 }
 
 #sims_F = measure("second_wave/second_T1:80_R0:2.0", "--second_ratio", [3.0, 3.5, 4.0])
 #sims_R0 = measure("second_wave/second_T1:100_F:2.5_s:0.25", "--R0", np.linspace(2.0, 2.6, 10))
 #for th in [10000,5000]:
 for th in [1000]:
-    #base_args["--config"] = f"../input/hun_{th}"
-    #measure(f"KSH2_{th}/base", "--R0", np.linspace(2.0, 2.6, 10))
-    base_args["--config"] = f"../input/hun_{th}/district"
+    base_args["--config"] = f"/u/student/bsc/adug96/Epidemicmodel/covid19-santiago/code/input/hun_{th}"
+    measure(f"KSH2_{th}/base", "--R0", np.linspace(2.0, 2.6, 10))
+    base_args["--config"] = f"/u/student/bsc/adug96/Epidemicmodel/covid19-santiago/code/input/hun_{th}/district"
     measure(f"KSH2_{th}/district", "--R0", np.linspace(2.0, 2.6, 10))
-    base_args["--config"] = f"../input/hun_{th}/district_eigen"
+    base_args["--config"] = f"/u/student/bsc/adug96/Epidemicmodel/covid19-santiago/code/input/hun_{th}/district_eigen"
     measure(f"KSH2_{th}/district_eigen", "--R0", np.linspace(2.0, 2.6, 10))

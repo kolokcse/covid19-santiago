@@ -7,10 +7,14 @@ import itertools
 from scipy import linalg
 
 # === DATA ===
-sett_types = pd.read_csv("../../data/hun/HU_places_admin_pop_ZIP_latlon.csv",
+sett_types = pd.read_csv("../../data/hun/HU_places_admin_pop_ZIP_latlon_district.csv",
            sep=',',
            header=0)
 KSH = pd.read_csv("../../data/hun/KSHCommuting_c1ID_c1name_c2ID_c2name_comm_school_work_DIR.csv",
+           sep=',',
+           header=0)
+
+hun_infecteds = pd.read_csv("../../data/hun/hun_approx_infecteds.csv",
            sep=',',
            header=0)
 
@@ -88,8 +92,8 @@ def add_ages(ages1, ages2):
     return ages
 
 def generate_district_pop_dict(populations, big_cities, out):
-    all_district = set(big_cities["admin municip"])
-    get_district = big_cities.set_index('place').to_dict()["admin municip"]
+    all_district = set(big_cities["district"])
+    get_district = big_cities.set_index('place').to_dict()["district"]
 
     pops = {}
     district_id_dict = {}
@@ -165,7 +169,7 @@ def create_commuting(cities, place_id_dict, big_cities, district_pops, district_
     pop_dict = {row['place']:row["population"] for _,row in sett_types.iterrows()}
 
 
-    get_district = big_cities.set_index('place').to_dict()["admin municip"]
+    get_district = big_cities.set_index('place').to_dict()["district"]
 
     mtx = np.zeros((N,N))
     mtx_dist = np.zeros((M,M))
@@ -293,7 +297,7 @@ def create_config(N, K, out):
     with open(f"../input/{out}/district_eigen/config.json", "w") as f:
         f.write(json.dumps(d, indent=4))
 # === MAIN ===
-th = 10000
+th = 1000
 dest_folder = f"hun_{th}"
 if(not os.path.exists(f"../input/{dest_folder}/district")):
     os.makedirs(f"../input/{dest_folder}/district")
