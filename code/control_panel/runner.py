@@ -9,6 +9,10 @@ from subprocess import Popen, STDOUT, PIPE
 
 from logger import TBLogger
 
+def moving_average(a, n=7) :
+    ret = np.cumsum(a, dtype=float)
+    ret[n:] = ret[n:] - ret[:-n]
+    return ret[n - 1:] / n
 
 def read_yaml(filename="input.yaml"):
     with open(filename) as file:
@@ -43,7 +47,7 @@ def get_inf_curve(df, death_rate, K):
     # Aggregate over cities
     return np.sum(I*death_rate, axis=1)+np.sum(I2*death_rate, axis=1), Is.sum(axis=1), Is2.sum(axis=1)
 
-def aggregate_county(pop_file, df, K, logger):
+def aggregate_county(pop_file, df, K):
     # Get city indexes of county
     with open(pop_file) as file:
         rows = []
@@ -60,35 +64,27 @@ def aggregate_county(pop_file, df, K, logger):
         chart = df[infs].agg(sum, axis=1)
         charts.append((county, chart))
     
-    for i in range(len(charts[0][1])):
-        logger.add_scalars(f"County(I)", {county:chart[i] for county,chart in charts}, global_step=i)
-    
     df = pd.DataFrame({county:chart for county,chart in charts})
-    df.to_csv("log/county.csv")
-    return network_size
+    df.to_csv("log/{args['sim_id']}/county.csv")
+    return network_size, charts
 
-def aggregate_age(df, K, network_size, logger):
+def aggregate_age(df, K, network_size):
     charts = []
     for age in range(K):
         infs = [f"I_{city}_{age}" for city in range(network_size)] + \
                [f"I2_{city}_{age}" for city in range(network_size)]
         chart = df[infs].agg(sum, axis=1)
         charts.append(chart)
-        
-    for i in range(len(charts[0])):
-        logger.add_scalars(f"Age(I)", {str(age): charts[age][i] for age in range(K)}, global_step=i)
-    
+            
     df = pd.DataFrame({str(age):charts[age] for age in range(K)})
-    df.to_csv("log/ages.csv")
+    df.to_csv("log/{args['sim_id']}/ages.csv")
 
 
-def aggregate_all(df, K, network_size, logger):
+def aggregate_all(df, K, network_size):
     # TODO multiply with death ratio
     infs = [f"I_{city}_{age}" for city in range(network_size) for age in range(K)] + \
             [f"I2_{city}_{age}" for city in range(network_size) for age in range(K)]
     chart = df[infs].agg(sum, axis=1)
-    for i,num in enumerate(chart):
-        logger.add_scalar(f"Total Infected", num, global_step=i)
 
 if __name__ == "__main__":
     ########################
@@ -115,9 +111,11 @@ if __name__ == "__main__":
     ########################
     #      SIMULATION      #
     ########################
+    if(not  os.path.exists(f"log/{args['sim_id']}")):
+        os.mkdir(f"log/{args['sim_id']}")
     # === Run simulation ===
     c_args = {
-        "--out": args['simulation_file'],
+        "--out": f"log/{args['sim_id']}/sim.csv",
         "--config": args['network_config_folder'],
         "--maxT": args['simulated_days'],
         "--R0": args['first_wave']['R0'],
@@ -135,28 +133,54 @@ if __name__ == "__main__":
     #       LOG/SIM        #
     ########################
     # === Read simulation data ===
-    df = pd.read_csv(args['simulation_file'])
-    logger = TBLogger(log_dir=f"log/sim_{args['sim_id']}")
+    df = pd.read_csv(f"log/{args['sim_id']}/sim.csv")
     pop_file = f"{args['network_config_folder']}/populations_KSH.json"
 
     # LOG: Deaths
     deaths, I, I2 = get_inf_curve(df, args['death_rate'], args['age_groups'])
-    for ind,d in enumerate(deaths):
-        logger.add_scalar("death_city", d, global_step=ind)
 
     # LOG: County infections
-    network_size = aggregate_county(pop_file, df, args['age_groups'], logger)
+    network_size, c_charts = aggregate_county(pop_file, df, args['age_groups'])
     
     # LOG: Age groups
-    aggregate_age(df, args['age_groups'], network_size, logger)
+    aggregate_age(df, args['age_groups'], network_size)
     
     ########################
     #       LOG/LOSS       #
     ########################
     #city_data = pd.read_csv("../hun_codes/data/HU_settlement_tempinfo.csv")
-    #district_data = pd.read_csv("../hun_codes/data/halalozas_megyenkent.csv")
-    # Megyénkénti log
+    home = "../.."
+    county_data = pd.read_csv(f"{home}/code/hun_codes/data/halalozas_megyenkent.csv").fillna(method='ffill')
+    county_data=county_data.rename(lambda l: l if l!="Budapest" else "főváros")[county_data.columns[1:]].diff(axis=0).dropna()
+    county_data[county_data<0]=0
+    county_data = county_data.rolling(7).mean().dropna()
 
+    # Megyénkénti log
+    losses = []
+    for i in range(80):
+        equal_ratio = np.sum([chart for label,chart in c_charts])/np.sum(county_data.iloc[154-i:154+args['simulated_days']-i].fillna(0).values)
+        c_loss_sum = 0
+        for county,chart in c_charts:
+            if(county == "főváros"): county="Budapest"
+            if(county not in county_data.columns):
+                print(county)
+            else:
+                g_truth = equal_ratio*county_data[county].to_numpy()[154-i:154+args['simulated_days']-i]
+                loss = np.sum(np.abs(g_truth-chart)**1)
+                c_loss_sum += loss/(args['simulated_days'])
+        #print(c_loss_sum/(19))
+        losses.append((c_loss_sum, equal_ratio))
+    
+    ind_min = np.argmin(losses)
+    shift,equal_ratio =losses[ind_min]
+    print(shift, equal_ratio)
+
+    #county_data.reindex()...
+    county_data.to_csv(f"log/{args['sim_id']}/country_loss.csv")
+    
+
+
+    #print(county_data[154:][["Budapest", "Dátum"]])
     # TODO:
     #    * Change plot to plotly
     #    * read real data

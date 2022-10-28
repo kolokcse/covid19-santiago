@@ -1,17 +1,16 @@
 ---
 # Simulation parameters
-sim_id: 1
+sim_id: 2
 age_groups: 8
-simulated_days: 300
+simulated_days: 200
 first_wave:
-  R0: 2.0
+  R0: 2.6
 second_wave:
   time: 100
   R0_ratio: 2.5
 seasonality: 0.25
 # TODO: doc
 network_config_folder: ../input/hun_10000
-simulation_file: log/sim.csv
 
 # Loss parameters
 loss:

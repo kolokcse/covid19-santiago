@@ -16,3 +16,8 @@ Colors, and grouping:
 * https://plotly.com/python/px-arguments/
 
 https://dash.plotly.com/external-resources
+
+
+Examples:
+https://dash.gallery/Portal/
+https://github.com/plotly/dash-sample-apps/blob/main/apps/dash-avs-explorer/app.py

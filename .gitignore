@@ -8,3 +8,5 @@ code/output/
 *.csv
 *.npy
 code/input
+*__pycache__
+code/build
